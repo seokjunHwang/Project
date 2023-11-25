@@ -1,0 +1,167 @@
+
+<!-- *** Info ***
+# 서버코드 'track_server_new.js'가 실행되고있어야 경로를 불러올 수 있다.
+# 아래 위도,경도와 로봇 id 두 개를 바꾸어 동적으로 수정가능
+
+1. 소비자제공용 트래킹맵 : 그라파나 대시보드상에 Tracking Map 독립적으로 작동
+2. 지속적 갱신 : gps20datas불러와서 주황색점 찍는함수만 10초마다 반복호출
+3. gps20datas의 시간데이터인 createAt의 시간에 맞게 주황색점끼리 직선으로 연결
+4. gps20datas가 갱신됨에따라 가장오래된 점과 경로는 지우고 새로운 경로를 지도에 그림 
+5. 외부포트 24003 : 서버코드 'track_server_new.js'와 연동
+-->
+
+
+<style>
+    #ecobot_map {
+        width: 100%;
+        height: 90%;
+    }
+</style>
+<div id="ecobot_map"></div>
+
+<script>
+
+    var map;
+    var isInitialLocationSet = false;
+    var robotPathCoordinates = [];
+    var currentRobotMarker = null;
+    var orangeMarkers = [];
+    var paths = [];
+    const API_BASE = "http://***********:24003";
+    const ROBOT_ID = 'r******5'; // 동적로봇 id설정, 필요에따라 이 부분만 변경하기
+    const ecobot_ID = "******"; 
+    const update_func = 10000; // 10초마다 한번씩 해당함수 반복호출
+
+    function initMap() {
+        // 로봇에따라 위도,경도 변경
+        initializeMapAtLocation(new google.maps.LatLng(35.8410, 128.4587)); 
+        ws_all_tracking_map = new WebSocket('ws://************:24101');
+        ws_all_tracking_map.onmessage = function (event) {
+            const msg = JSON.parse(event.data);
+
+            if (msg.topic === "/"+ecobot_ID+"/gps_location") {
+                const gpsMessage = JSON.parse(msg.message);
+                console.log("Received GPS Data:", gpsMessage);
+
+                const gpsData = {
+                    lat: gpsMessage.latitude,
+                    lng: gpsMessage.longitude
+                };
+                updateRobotMarkersAndPath(gpsData);
+            }
+        };
+
+        fetchGps20DataForRobot(ROBOT_ID);  // 여기서 GPS 20 데이터를 가져옵니다.
+
+        // 10초마다 fetchGps20DataForRobot 함수를 호출합니다.
+        setInterval(function() {
+            fetchGps20DataForRobot(ROBOT_ID);
+        }, update_func); // 10초마다 해당함수 반복호출
+    }
+
+    function fetchGps20DataForRobot(robotID) {
+        fetch(API_BASE + "/get-gps20data-for-robot/" + robotID)
+            .then(response => response.json())
+            .then(data => {
+                // 기존의 마커와 경로를 삭제합니다.
+                orangeMarkers.forEach(marker => marker.setMap(null));
+                orangeMarkers = [];
+                paths.forEach(path => path.setMap(null));
+                paths = [];
+                robotPathCoordinates = [];
+                
+                data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // 데이터를 시간 순서대로 정렬합니다.
+                
+                data.forEach(gpsData => {
+                    const loc = new google.maps.LatLng(gpsData.lat, gpsData.lng);
+                    robotPathCoordinates.push(loc);
+                    const newMarker = placeOrangeMarker(loc);  // 주황색 마커를 추가하는 함수
+                    orangeMarkers.push(newMarker);
+                });
+        
+                redrawPathBetweenMarkers();  // 마커 사이에 경로를 다시 그립니다.
+            });
+    }
+    
+    function redrawPathBetweenMarkers() {
+        // 기존의 경로를 제거합니다.
+        if (paths.length > 0) {
+            for (const path of paths) {
+                path.setMap(null);
+            }
+            paths = [];
+        }
+        
+        const path = new google.maps.Polyline({
+            path: robotPathCoordinates,
+            geodesic: true,
+            strokeColor: '#FFA500',
+            strokeOpacity: 1.0,
+            strokeWeight: 2,
+            map: map
+        });
+        paths.push(path);
+    }
+    
+    function placeOrangeMarker(location) {
+        const marker = new google.maps.Marker({
+            position: location,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 2,
+                fillColor: '#FFA500',
+                fillOpacity: 1,
+                strokeColor: '#FFA500',
+                strokeWeight: 2
+            }
+        });
+        return marker;
+    }
+    
+
+
+    function updateRobotMarkersAndPath(gpsData) {
+        if (typeof gpsData.lat === "number" && typeof gpsData.lng === "number") {
+            const latestLocation = new google.maps.LatLng(gpsData.lat, gpsData.lng);
+        
+            if (!isInitialLocationSet) {
+                initializeMapAtLocation(latestLocation);
+                isInitialLocationSet = true;
+                return;
+            }
+        
+            placeRobotMarker(latestLocation);
+            robotPathCoordinates.push(latestLocation);
+        } else {
+            console.error("Invalid GPS data received:", gpsData);
+        }
+    }
+
+    function placeRobotMarker(location) {
+        if (currentRobotMarker) {
+            currentRobotMarker.setMap(null);
+        }
+
+        currentRobotMarker = new google.maps.Marker({
+            position: location,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 2,
+                strokeColor: '#ffff00'
+            }
+        });
+    }
+
+    function initializeMapAtLocation(location) {
+        const mapElementId = "ecobot_map"; // 동적 요소 ID 생성
+        map = new google.maps.Map(document.getElementById(mapElementId), {
+            zoom: 15,
+            center: location,
+            disableDefaultUI: true,
+            mapTypeId: 'satellite'
+        });
+    }
+</script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=******&callback=initMap"></script>
