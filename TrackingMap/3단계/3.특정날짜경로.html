@@ -1,8 +1,3 @@
-<!-- *** Info ***
-서버코드 : oneday_course_server.js
-특정날짜선택시, 파랑색경로로 표시
-이는 psql에서 water_quality에서 위치데이터만 불러옴
--->
 
 <style>
     #ecobot_map {
@@ -25,7 +20,7 @@
     var currentRobotMarker = null;
     var orangeMarkers = [];
     var paths = [];
-    const API_BASE = "http://125.136.64.124:24003";
+    const API_BASE = "http://********";
     const ROBOT_ID = 'robot00005'; // 동적로봇 id설정, 필요에따라 이 부분만 변경하기
     const ecobot_ID = "ecobot00005"; 
     const update_func = 10000; // 10초마다 한번씩 해당함수 반복호출
@@ -35,7 +30,7 @@
     function initMap() {
         // 로봇에따라 위도,경도 변경
         initializeMapAtLocation(new google.maps.LatLng(lat, lng)); 
-        ws_all_tracking_map = new WebSocket('ws://125.136.64.124:24101');
+        ws_all_tracking_map = new WebSocket('ws://1********');
         ws_all_tracking_map.onmessage = function (event) {
             const msg = JSON.parse(event.data);
   
@@ -193,12 +188,12 @@
     
     function fetchDataBasedOnDate() {
         const date = document.getElementById('date-picker').value;
-        fetch(`http://125.136.64.124:24003/get-water-quality?date=${date}`, {
+        fetch(`http://********/get-water-quality?date=${date}`, {
             method: 'GET',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': 'http://125.136.64.124:23000',
+                'Access-Control-Allow-Origin': 'http://********',
             },
         })
         .then(response => response.json())
@@ -241,4 +236,4 @@
     }
     
   </script>
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBsKGG9iHYhgK1gOtqS9vfPnVX61O3tcvQ&callback=initMap"></script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=****************Q&callback=initMap"></script>

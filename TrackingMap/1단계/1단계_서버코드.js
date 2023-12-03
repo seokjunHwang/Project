@@ -13,7 +13,7 @@ app.listen(PORT, () => {
 // MongoDB 데이터베이스 연결 설정
 const USERNAME = '*********';
 const PASSWORD = '*********';
-const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:27017/mapCourseDB?authSource=admin`;
+const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:********/'*********';?authSource='*********';`;
 
 // MongoDB 연결: useNewUrlParser와 useUnifiedTopology 옵션 사용
 mongoose.connect(DB_URI, {

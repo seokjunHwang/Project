@@ -1,13 +1,3 @@
-// *** info ***
-// 기존의 track_server_new.js코드의 포트 4003(외부포트:24003)과 통합하여 특정날짜 입력하면 그 경로를 띄울 수 있다.
-// psql의 water_quality테이블의 gps데이터컬럼을 timestamp의 시간순서대로 불러와서 대시보드에서 특정날짜를 입력하면 그 날짜에 다녀왔던 경로를 쫙 띄우게끔
-
-// *** 파이프라인 ***
-// - 기존의 경로html(소비자용)에서 기능을 추가한다. 파일명 : oneday_course.html
-// 1. psql의 andong_1데이터베이스에서 water_quality라는 테이블의 timestamp,latitude,longitude컬럼데이터를 가져온다.
-// 2. 대시보드상에서 2023년 10워 31일 이렇게 날짜를 선택하면 해당 timestamp의 순서대로 latitude,longitude 를 토대로 한 주황색 선 경로를 나타낸다.
-
-
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -17,25 +7,25 @@ const http = require('http');
 const WebSocket = require('ws');
 
 const app = express();
-const PORT = 4003;  // 서버 코드 1의 포트,  // 외부포트 24003으로 포트포워딩해놓음
+const PORT = 4003;  // 서버 코드 1
 const gpsdatas_interval = 2000; // gpsdatas에 1초당 1개씩 모든로봇gps저장 (최대 100개 )
 const gps20datas_interval = 60000; // 60000밀리초 = 1분마다 1개씩 gps20datas에 모든로봇 gps데이터 저장 (로봇마다 최대 20개씩)
 
 // DB 설정을 위한 매개변수
-const MONGO_DATABASE = "mapCourseDB";
-const POSTGRES_DATABASE = "andong_1";
-const POSTGRES_COLLECTION = "water_quality";
+const MONGO_DATABASE = "********";
+const POSTGRES_DATABASE = "********";
+const POSTGRES_COLLECTION = "********";
 
 // 특정 도메인에서의 요청만 허용
 const corsOptions = {
-    origin: 'http://125.136.64.124:23000', // 요청을 허용할 도메인 설정
+    origin: 'http://********:********', // 요청을 허용할 도메인 설정
     credentials: true, // 쿠키를 허용
   };
   
 app.use(cors(corsOptions));
 
 const server = http.createServer(app);
-const ws = new WebSocket('ws://125.136.64.124:24101'); // 24101에 전체로봇의 gps데이터가 들어오고있다.
+const ws = new WebSocket('ws://********:********'); // 24101에 전체로봇의 gps데이터가 들어오고있다.
 
 ws.on('open', function open() {
     console.log('Connected to the WebSocket server.');
@@ -125,9 +115,9 @@ server.listen(PORT, () => {
 });
 
 // MongoDB 연결
-const USERNAME = 'eco0';
-const PASSWORD = '820429ape';
-const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:27017/${MONGO_DATABASE}?authSource=admin`;
+const USERNAME = '********';
+const PASSWORD = '********';
+const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:********/${MONGO_DATABASE}?authSource=********`;
 
 mongoose.connect(DB_URI, {
     useNewUrlParser: true,
@@ -303,21 +293,21 @@ app.get('/get-gps20data-for-robot/:robotID', async (req, res) => {
 // 두번째서버 : PostgreSQL 데이터베이스 연결 (서버 코드 2에서 가져옴)
 // PostgreSQL 데이터베이스 연결
 const pool = new Pool({
-    user: 'eco0',
-    host: 'localhost',
+    user: '********',
+    host: '********',
     database: POSTGRES_DATABASE,
-    password: '820429ape',
+    password: '********',
     port: 5432,
 });
   
 //   // CORS 설정 (서버 코드 2에서 가져옴)
 //   app.use(cors({
-//     origin: 'http://125.136.64.124:23000',
+//     origin: 'http://********',
 //     credentials: true
 //   }));
   
   // PostgreSQL 데이터베이스를 사용하는 라우트 추가 (서버 코드 2에서 가져옴)
-  app.get('/get-water-quality', async (req, res) => {
+  app.get('/get-water-********', async (req, res) => {
     const date = req.query.date;
     try {
       const result = await pool.query(`
@@ -346,4 +336,4 @@ const pool = new Pool({
     }
   });
   // psql로부터 gps데이터가 잘 들어오고있는지 확인하려면 아래주소들어가면댐
-  // http://125.136.64.124:24003/get-water-quality?date=2023-10-31
+  // http://********/get-********-********?date=2023-10-31
