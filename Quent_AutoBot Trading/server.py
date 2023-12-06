@@ -1,9 +1,12 @@
 import logging
+import os
+import csv
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request, jsonify
 import bot_module  # 수정된 모듈 이름으로 import
 
 app = Flask(__name__)
+
 
 # 로거 설정
 logger = logging.getLogger("webhook_logger")
@@ -27,10 +30,18 @@ def handle_exception(e):
 def webhook():
     # JSON 데이터인 경우
     if request.is_json:
+        received_data = request.json
         bot_module.update_data(request.json)  # 모듈의 변수를 업데이트
     # JSON 아닌경우
     else:
-        bot_module.update_data(request.data.decode())  # 바이트를 문자열로 변환
+        received_data = request.data.decode()  # 바이트를 문자열로 변환
+        bot_module.update_data(request.data.decode())  
+    
+    # 파일에 메시지 저장
+    with open('Webhook_Message.csv', 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow([received_data])
+
     logger.info("Received webhook data: %s", bot_module.get_message())  # 파일에 로그 기록
     print(bot_module.get_message())
 
@@ -64,8 +75,16 @@ def favicon():
     return app.send_static_file('favicon.ico')
 
 
+
 if __name__ == '__main__':
+    # Webhook_Message.csv 파일 초기화
+    with open('Webhook_Message.csv', 'w', newline='') as csvfile:
+        pass  # 파일을 열고 바로 닫아 내용을 초기화 : 서버실행될때마다 새로운 웹훅데이터만 저장할 수 있음
+
     app.run(host='0.0.0.0', port=10080)
+    # 0.0.0.0 : Flask 서버가 설정된 포트에서 모든 네트워크 인터페이스를 통해 접근 가능
+
+
 
 
 

@@ -20,8 +20,8 @@ def get_message():
     return tradingview_massage
 
 # Load API Keys from csv file (access,secret 키 불러오는 함수)
-def read_csv_lines():
-    file_path = 'APIkey.csv'
+def read_API_URL_CSV():
+    file_path = '/****/APIkey.csv'
     lines_to_read = [2, 4, 6]
     data = {}
     with open(file_path, newline='') as csvfile:
@@ -31,7 +31,14 @@ def read_csv_lines():
                 data[i] = row[0]
     return data
 
-
+# 웹훅메시지(트레이딩뷰) 읽어오는 함수
+def read_Webhook_csv(filename):
+    with open(filename, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        for row in csvreader:
+            print(" ----------- Received Tradingview Message :", row[0], "----------")
+            return row[0]  # 첫 번째 행의 첫 번째 열을 반환하고 함수 종료
+        
 
 ### < 지표 함수 모음 >
 

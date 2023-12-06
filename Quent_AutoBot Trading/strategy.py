@@ -209,7 +209,7 @@ class TradingBot:
         signal_words = ["Long", "Short", "Long Close", "Short Close"]
 
         # 모든 조건이 만족할 때만 "No Signal" 메시지를 출력
-        if all(word not in self.message for word in signal_words): # if not any(word in self.message for word in signal_words): 하나라도 포함이안되있다면,
+        if self.message == None or all(word not in self.message for word in signal_words): # if not any(word in self.message for word in signal_words): 하나라도 포함이안되있다면,
             print(" ---------- No Signal in Tradingview Message : ", self.message, "----------")
         else:
             ### 포지션 진입 : 현재 No Position 이라면, 
