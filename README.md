@@ -4,6 +4,8 @@ My Projects
 
 ## 1. MachineLearning - Regression
 
-## 2. Quent Project
+## 2. NLP Project
 
-## 3. Tracking Mqp
+## 3. Quent Project
+
+## 4. Tracking Mqp
