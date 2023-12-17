@@ -1,0 +1,82 @@
+<!-- 경로없이 현재위치만 노랑점으로 계속 갱신되어 표시 -->
+<style>
+    #ecobot_map {
+        width: 100%;
+        height: 90%;
+    }
+</style>
+<div id="ecobot_map"></div>
+
+<script>
+    var map;
+    var isInitialLocationSet = false;
+    var robotPathCoordinates = [];
+    var currentRobotMarker = null;
+    const API_BASE = "http://**************:24003"; // 서버코드 API
+    const ROBOT_ID = 'robot00003'; // 동적로봇 id설정, 필요에따라 이 부분만 변경하기
+    const ecobot_ID = "ecobot00003"; 
+
+    function initMap() {
+        // 로봇에따라 위도,경도 변경
+        initializeMapAtLocation(new google.maps.LatLng(35.8410, 128.4587)); 
+        ws_all_tracking_map = new WebSocket('ws://*************:24101'); //MQTT메시지 웹소캣
+        ws_all_tracking_map.onmessage = function (event) {
+            const msg = JSON.parse(event.data);
+
+            if (msg.topic === "/"+ecobot_ID+"/gps_location") {
+                const gpsMessage = JSON.parse(msg.message);
+                console.log("Received GPS Data:", gpsMessage);
+
+                const gpsData = {
+                    lat: gpsMessage.latitude,
+                    lng: gpsMessage.longitude
+                };
+                updateRobotMarkersAndPath(gpsData);
+            }
+        };
+    }
+
+    function updateRobotMarkersAndPath(gpsData) {
+        if (typeof gpsData.lat === "number" && typeof gpsData.lng === "number") {
+            const latestLocation = new google.maps.LatLng(gpsData.lat, gpsData.lng);
+        
+            if (!isInitialLocationSet) {
+                initializeMapAtLocation(latestLocation);
+                isInitialLocationSet = true;
+                return;
+            }
+        
+            placeRobotMarker(latestLocation);
+            robotPathCoordinates.push(latestLocation);
+        } else {
+            console.error("Invalid GPS data received:", gpsData);
+        }
+    }
+
+    function placeRobotMarker(location) {
+        if (currentRobotMarker) {
+            currentRobotMarker.setMap(null);
+        }
+
+        currentRobotMarker = new google.maps.Marker({
+            position: location,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 2,
+                strokeColor: '#ffff00'
+            }
+        });
+    }
+
+    function initializeMapAtLocation(location) {
+        const mapElementId = "ecobot_map"; // 동적 요소 ID 생성
+        map = new google.maps.Map(document.getElementById(mapElementId), {
+            zoom: 15,
+            center: location,
+            disableDefaultUI: true,
+            mapTypeId: 'satellite'
+        });
+    }
+</script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=****************&callback=initMap"></script>
