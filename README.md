@@ -8,8 +8,9 @@ My Projects
 
 ### Mini Project
 
-Quant Auto Traiding Bot
-Tracking Map
+- Quant Auto Traiding Bot
+
+- Tracking Map
 
 
 
