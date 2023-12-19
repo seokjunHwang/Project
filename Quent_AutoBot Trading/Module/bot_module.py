@@ -1,25 +1,15 @@
-# 모듈이란 함수나 변수 또는 클래스를 모아 놓은 파이썬 파일이다. 모듈은 다른 파이썬 프로그램에서 불러와 사용할 수 있도록 만든 파이썬 파일이라고도 할 수 있다.
-# Module Info
-# 트레이딩뷰 웹훅 메시지, 지표함수들
+
+'''
+Module Info
+Manage Traidingview message, Indicators
+'''
 
 import ccxt 
 import time
 import pandas as pd
-import pprint
-import requests
 import csv
 
-# 트레이딩뷰 웹훅메시지 변수 : server.py에서 받는 웹훅메시지를 담은 변수
-tradingview_massage = None
-
-def update_data(new_data):
-    global tradingview_massage
-    tradingview_massage = new_data
-
-def get_message():
-    return tradingview_massage
-
-# Load API Keys from csv file (access,secret 키 불러오는 함수)
+# Load API Keys from csv file (access,secret)
 def read_API_URL_CSV():
     file_path = '/****/APIkey.csv'
     lines_to_read = [2, 4, 6]
@@ -27,22 +17,25 @@ def read_API_URL_CSV():
     with open(file_path, newline='') as csvfile:
         csv_reader = csv.reader(csvfile)
         for i, row in enumerate(csv_reader, start=1):
-            if i in lines_to_read: # data에 인덱스 i를 키로 하고, 현재 행의 첫 번째 열(row[0])을 값으로 저장
-                data[i] = row[0]
+            if i in lines_to_read: 
+                data[i] = row[0] # index : key, row : value
     return data
 
-# 웹훅메시지(트레이딩뷰) 읽어오는 함수
+# Load Webhook message
 def read_Webhook_csv(filename):
     with open(filename, 'r') as csvfile:
         csvreader = csv.reader(csvfile)
         for row in csvreader:
             print(" ----------- Received Tradingview Message :", row[0], "----------")
-            return row[0]  # 첫 번째 행의 첫 번째 열을 반환하고 함수 종료
+            return row[0]  
         
 
-### < 지표 함수 모음 >
 
-# RSI지표 수치를 구해준다. 첫번째: 분봉/일봉 정보, 두번째: 기간, 세번째: 기준 날짜
+
+### < Indicators > ###
+
+# RSI
+# 첫번째: 분봉/일봉 정보, 두번째: 기간, 세번째: 기준 날짜
 def GetRSI(ohlcv,period,st):
     ohlcv["close"] = ohlcv["close"]
     delta = ohlcv["close"].diff()
@@ -54,13 +47,15 @@ def GetRSI(ohlcv,period,st):
     RS = _gain / _loss
     return float(pd.Series(100 - (100 / (1 + RS)), name="RSI").iloc[st])
 
-# 이동평균선 수치를 구해준다 첫번째: 분봉/일봉 정보, 두번째: 기간, 세번째: 기준 날짜
+# MA
+# 첫번째: 분봉/일봉 정보, 두번째: 기간, 세번째: 기준 날짜
 def GetMA(ohlcv,period,st):
     close = ohlcv["close"]
     ma = close.rolling(period).mean()
     return float(ma.iloc[st])
 
-# 분봉/일봉 캔들 정보를 가져온다 첫번째: 바이낸스 객체, 두번째: 코인 티커, 세번째: 기간 (1d,4h,1h,15m,10m,1m ...)
+# Candle Info
+# 첫번째: 바이낸스 객체, 두번째: 코인 티커, 세번째: 기간 (1d,4h,1h,15m,10m,1m ...)
 def GetOhlcv(binance, Ticker, period):
     btc_ohlcv = binance.fetch_ohlcv(Ticker, period)
     df = pd.DataFrame(btc_ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
@@ -68,7 +63,8 @@ def GetOhlcv(binance, Ticker, period):
     df.set_index('datetime', inplace=True)
     return df
 
-# 스탑로스ST를 걸어놓는다. 해당 가격에 해당되면 바로 손절한다. 첫번째: 바이낸스 객체, 두번째: 코인 티커, 세번째: 손절 수익율 (1.0:마이너스100% 청산, 0.9:마이너스 90%, 0.5: 마이너스 50%)
+# Set StopLoss
+# 해당 가격에 해당되면 바로 손절한다. 첫번째: 바이낸스 객체, 두번째: 코인 티커, 세번째: 손절 수익율 (1.0:마이너스100% 청산, 0.9:마이너스 90%, 0.5: 마이너스 50%)
 def SetStopLoss(binance, Ticker, cut_rate):
     time.sleep(0.1)
     #주문 정보를 읽어온다.
@@ -127,7 +123,7 @@ def SetStopLoss(binance, Ticker, cut_rate):
 
             print("---------------------- Stop Loss SETTING DONE ----------------------")
 
-# 테이크프로핏TP(수익종료)을 걸어놓는다.
+# Set TakeProfit
 def SetTakeProfit(binance, Ticker, Profit_rate):
     time.sleep(0.1)
     # 내 포지션/주문상태 정보를 읽어온다.
@@ -186,7 +182,8 @@ def SetTakeProfit(binance, Ticker, Profit_rate):
 
             print("---------------------- TAKE PROFIT SETTING DONE ----------------------")
 
-# 구매할 수량을 구한다.  첫번째: 돈(USDT), 두번째:코인 가격, 세번째: 비율 1.0이면 100%, 0.5면 50%
+# Amount to Entry
+# 첫번째: 돈(USDT), 두번째:코인 가격, 세번째: 비율 1.0이면 100%, 0.5면 50%
 def GetAmount(usd, coin_price, rate):
 
     target = usd * rate 
@@ -200,7 +197,8 @@ def GetAmount(usd, coin_price, rate):
     #print("amout", amout)
     return amout
 
-#거래할 코인의 현재가를 가져온다. 첫번째: 바이낸스 객체, 두번째: 코인 티커
+# Get now price
+# 첫번째: 바이낸스 객체, 두번째: 코인 티커
 def GetCoinNowPrice(binance,Ticker):
     coin_info = binance.fetch_ticker(Ticker)
     coin_price = coin_info['last'] # coin_info['close'] == coin_info['last'] 

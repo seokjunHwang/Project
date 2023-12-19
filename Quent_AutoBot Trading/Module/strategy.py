@@ -1,4 +1,5 @@
-# 전략모음 모듈
+# Strategy module
+
 import ccxt 
 import time
 import pandas as pd
@@ -6,7 +7,7 @@ import pprint
 import bot_module
 
 
-### < 지표함수 모듈 불러오기 >
+# Load indicators
 GetRSI = bot_module.GetRSI
 GetMA = bot_module.GetMA
 GetOhlcv = bot_module.GetOhlcv
@@ -15,7 +16,7 @@ SetTakeProfit = bot_module.SetTakeProfit
 GetAmount = bot_module.GetAmount
 GetCoinNowPrice = bot_module.GetCoinNowPrice
 
-# 전략 클래쓰
+# Strategy Class
 class TradingBot:
     def __init__(self, access, secret, Target_Coin_Ticker, Target_Coin_Symbol, leverage, myUSDT_percent, first_amount_percent, stop_rate, profit_rate ):
         self.binanceX = ccxt.binance(config={
@@ -36,7 +37,8 @@ class TradingBot:
         else:
             self.PNLx1 = self.PNL / self.leverage                                    
         self.coin_price = GetCoinNowPrice(self.binanceX, self.Target_Coin_Ticker)    # 타겟코인의 현재가
-        self.max_amount = round(GetAmount(   # 최대 운용수량(매수가능수량) : ex)"myUSDT_percent"가 50이면 내 전체자산의 50%로 최대 구매가능한 코인수량
+        # 최대 운용수량(진입가능수량) ex. "myUSDT_percent"가 50이면 내 전체자산의 50%로 최대 구매가능한 코인수량
+        self.max_amount = round(GetAmount(      
             float(self.balance['USDT']['total']),self.coin_price, self.myUSDT_percent) ,4) * leverage 
         self.first_amount = round((self.max_amount / 100) * first_amount_percent, 4) # 첫 진입할 수량 (최대수량에서 몇 % 사용할지?)
         self.stop_rate = stop_rate / 100                                             # 손절라인 레버x1 기준
@@ -45,12 +47,12 @@ class TradingBot:
         self.my_real_losspercent = -(self.stop_rate * self.leverage * 100)             
         self.my_real_profitpercent = self.profit_rate * self.leverage * 100 
    
-    # 거래소의 차트(지표)정보를 가져온다.
+    # Load Exchange Chart Info
     def fetch_data(self):
-        # 캔들데이터
+        # Candle info
         self.df_15 = GetOhlcv(self.binanceX, self.Target_Coin_Ticker, '15m')
         self.df_5 = GetOhlcv(self.binanceX, self.Target_Coin_Ticker, '5m')
-        # MA 이동평균선
+        # MA
         self.ma7_before3 = GetMA(self.df_5, 7, -4)
         self.ma7_before2 = GetMA(self.df_5 , 7, -3)
         self.ma7_before1 = GetMA(self.df_5 , 7, -2)
@@ -61,16 +63,16 @@ class TradingBot:
         #RSI14 
         self.rsi14 = GetRSI(self.df_5, 14, -1)
 
-    # 세팅하기
+    # Setting
     def setting(self):
-        # 레버레이지 설정
+        # Leverage
         try:
             response = self.binanceX.fapiPrivatePostLeverage({'symbol': self.Target_Coin_Symbol, 'leverage': int(self.leverage)})
             print("Leverage Set to:", self.leverage, " /  Response:", response)
         except Exception as e:
             print("error:", e)
             
-        # 내 포지션 변수지정
+        # Load My position info
         time.sleep(0.1)
         for posi in self.balance['info']['positions']:
             if posi['symbol'] == self.Target_Coin_Symbol:
@@ -84,7 +86,7 @@ class TradingBot:
         # 수량의 절댓값 (기존 숏포지션 종료를 위함)
         self.abs_amt = abs(self.amt)
 
-        # 격리(Isolated) 설정
+        # Set Isolated
         if self.isolated == False:
             try:
                 print(self.binanceX.fapiPrivatePostLeverage({'symbol': self.Target_Coin_Symbol, 'marginType': 'ISOLATED'}))
@@ -110,14 +112,14 @@ class TradingBot:
             print("My Real StopLoss Rate : ", self.my_real_losspercent,"%", "   / StopLoss(x1) Rate : ", -(self.stop_rate * 100),"%")
             print("My Real TakeProfit Rate : ", self.my_real_profitpercent,"%", "  / TakeProfit(x1) Rate : ", self.profit_rate * 100,"%") 
 
-    # 전략 클래쓰
- 
+
+    # Strategy 1
     def strategy_1(self):
 
         self.fetch_data() # 차트지표정보 가져오기
         self.setting() # 세팅하기
 
-        ### 포지션 진입 : 현재 "포지션진입전"이라면..
+        ### Entry Short
         if self.amt == 0:
             # 기존 체결안된 주문들 모두취소
             self.binanceX.cancel_all_orders(self.Target_Coin_Ticker)
@@ -155,7 +157,7 @@ class TradingBot:
                 SetStopLoss(self.binanceX, self.Target_Coin_Ticker, self.stop_rate) # 1% 손실 시 스탑
                 SetTakeProfit(self.binanceX, self.Target_Coin_Ticker, self.profit_rate)
 
-        ### 포지션 종료 : 이미 포지션 잡힌 상태라면 (amb != 0)
+        ### Close Position : 이미 포지션 잡힌 상태라면 (amb != 0)
         else:
             # 현재 숏일때, size(amt) : 음수 
             if self.amt < 0:
@@ -199,7 +201,7 @@ class TradingBot:
                 else:
                     print("---------------- Long position Stay ! -----------------")
 
-    # 전략_2 : 트레이딩뷰 웹훅메시지에 따른 롱/숏 진입
+    # Strategy 2 : 트레이딩뷰 웹훅메시지에 따른 롱/숏 진입
     def strategy_2(self, message):
         self.fetch_data() # 차트지표정보 가져오기
         self.setting() # 세팅하기
@@ -245,7 +247,7 @@ class TradingBot:
                     SetTakeProfit(self.binanceX, self.Target_Coin_Ticker, self.profit_rate)
 
 
-            ### 포지션 종료 : 이미 포지션 잡힌 상태라면 (amb != 0)
+            ### Close Position : 이미 포지션 잡힌 상태라면 (amb != 0)
             else:
                 # 현재 숏일때, size(amt) : 음수 
                 if self.amt < 0:
