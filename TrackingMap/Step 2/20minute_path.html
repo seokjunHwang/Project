@@ -1,5 +1,3 @@
-
-
 <style>
     #ecobot_map {
         width: 100%;
@@ -17,17 +15,18 @@
     var orangeMarkers = [];
     var paths = [];
     const API_BASE = "http://***********:24003";
-    const ROBOT_ID = 'r******5'; // 동적로봇 id설정, 필요에따라 이 부분만 변경하기
+    const ROBOT_ID = 'r******5'; // Set robot ID
     const ecobot_ID = "******"; 
-    const update_func = 10000; // 10초마다 한번씩 해당함수 반복호출
+    const update_func = 10000; // Call function every 10 sec
 
     function initMap() {
-        // 로봇에따라 위도,경도 변경
+        // Set latitude and longitude
         initializeMapAtLocation(new google.maps.LatLng(35.8410, 128.4587)); 
         ws_all_tracking_map = new WebSocket('ws://************:24101');
         ws_all_tracking_map.onmessage = function (event) {
             const msg = JSON.parse(event.data);
 
+            // Process GPS data and update the map
             if (msg.topic === "/"+ecobot_ID+"/gps_location") {
                 const gpsMessage = JSON.parse(msg.message);
                 console.log("Received GPS Data:", gpsMessage);
@@ -40,40 +39,42 @@
             }
         };
 
-        fetchGps20DataForRobot(ROBOT_ID);  // 여기서 GPS 20 데이터를 가져옵니다.
+        fetchGps20DataForRobot(ROBOT_ID);  // Load initial GPS data
 
-        // 10초마다 fetchGps20DataForRobot 함수를 호출합니다.
+        // Repeatedly call function to update GPS data
         setInterval(function() {
             fetchGps20DataForRobot(ROBOT_ID);
-        }, update_func); // 10초마다 해당함수 반복호출
+        }, update_func);
     }
 
     function fetchGps20DataForRobot(robotID) {
+        // Fetch and process GPS data for the robot
         fetch(API_BASE + "/get-gps20data-for-robot/" + robotID)
             .then(response => response.json())
             .then(data => {
-                // 기존의 마커와 경로를 삭제합니다.
+                // Clear existing markers and paths
                 orangeMarkers.forEach(marker => marker.setMap(null));
                 orangeMarkers = [];
                 paths.forEach(path => path.setMap(null));
                 paths = [];
                 robotPathCoordinates = [];
                 
-                data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // 데이터를 시간 순서대로 정렬합니다.
+                data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // Sort data by time
                 
+                // Place new markers and draw paths
                 data.forEach(gpsData => {
                     const loc = new google.maps.LatLng(gpsData.lat, gpsData.lng);
                     robotPathCoordinates.push(loc);
-                    const newMarker = placeOrangeMarker(loc);  // 주황색 마커를 추가하는 함수
+                    const newMarker = placeOrangeMarker(loc);
                     orangeMarkers.push(newMarker);
                 });
         
-                redrawPathBetweenMarkers();  // 마커 사이에 경로를 다시 그립니다.
+                redrawPathBetweenMarkers();
             });
     }
     
     function redrawPathBetweenMarkers() {
-        // 기존의 경로를 제거합니다.
+        // Redraw paths between markers
         if (paths.length > 0) {
             for (const path of paths) {
                 path.setMap(null);
@@ -81,6 +82,7 @@
             paths = [];
         }
         
+        // Create and display new path
         const path = new google.maps.Polyline({
             path: robotPathCoordinates,
             geodesic: true,
@@ -93,6 +95,7 @@
     }
     
     function placeOrangeMarker(location) {
+        // Place an orange marker on the map
         const marker = new google.maps.Marker({
             position: location,
             map: map,
@@ -107,19 +110,20 @@
         });
         return marker;
     }
-    
-
 
     function updateRobotMarkersAndPath(gpsData) {
+        // Update robot marker and path with new GPS data
         if (typeof gpsData.lat === "number" && typeof gpsData.lng === "number") {
             const latestLocation = new google.maps.LatLng(gpsData.lat, gpsData.lng);
         
+            // Set initial location if not already set
             if (!isInitialLocationSet) {
                 initializeMapAtLocation(latestLocation);
                 isInitialLocationSet = true;
                 return;
             }
         
+            // Place new robot marker and update path
             placeRobotMarker(latestLocation);
             robotPathCoordinates.push(latestLocation);
         } else {
@@ -128,6 +132,7 @@
     }
 
     function placeRobotMarker(location) {
+        // Place a marker for the robot on the map
         if (currentRobotMarker) {
             currentRobotMarker.setMap(null);
         }
@@ -144,7 +149,8 @@
     }
 
     function initializeMapAtLocation(location) {
-        const mapElementId = "ecobot_map"; // 동적 요소 ID 생성
+        // Initialize the map with a given location
+        const mapElementId = "ecobot_map";
         map = new google.maps.Map(document.getElementById(mapElementId), {
             zoom: 15,
             center: location,

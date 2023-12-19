@@ -1,0 +1,242 @@
+
+<style>
+    #ecobot_map {
+        width: 100%;
+        height: 90%;
+    }
+</style>
+<div id="ecobot_map"></div>
+<div style="margin: 10px;">
+    <label for="date-picker">Date Selection:</label>
+    <input type="date" id="date-picker" value="2023-10-31">
+    <button onclick="fetchDataBasedOnDate()">Fetch Data</button>
+</div>
+
+<script>
+
+var map;
+var isInitialLocationSet = false;
+var robotPathCoordinates = [];
+var currentRobotMarker = null;
+var orangeMarkers = [];
+var paths = [];
+const API_BASE = "http://********";
+const ROBOT_ID = 'robot00005';      // Set robot ID
+const ecobot_ID = "ecobot00005"; 
+const update_func = 10000;          // Call this function every 10 seconds
+const lat = 35.6284;                // Latitude
+const lng = 127.1435;               // Longitude
+
+function initMap() {
+    // Change latitude and longitude based on the robot
+    initializeMapAtLocation(new google.maps.LatLng(lat, lng)); 
+    ws_all_tracking_map = new WebSocket('ws://1********');
+    ws_all_tracking_map.onmessage = function (event) {
+        const msg = JSON.parse(event.data);
+
+        if (msg.topic === "/"+ecobot_ID+"/gps_location") {
+            const gpsMessage = JSON.parse(msg.message);
+            console.log("Received GPS Data:", gpsMessage);
+
+            const gpsData = {
+                lat: gpsMessage.latitude,
+                lng: gpsMessage.longitude
+            };
+            updateRobotMarkersAndPath(gpsData);
+        }
+    };
+
+    fetchGps20DataForRobot(ROBOT_ID);  // Fetch GPS 20 data here
+
+    // Call fetchGps20DataForRobot function every 10 seconds
+    setInterval(function() {
+        fetchGps20DataForRobot(ROBOT_ID);
+    }, update_func);
+}
+
+function fetchGps20DataForRobot(robotID) {
+    fetch(API_BASE + "/get-gps20data-for-robot/" + robotID)
+        .then(response => response.json())
+        .then(data => {
+            // Remove existing markers and paths
+            orangeMarkers.forEach(marker => marker.setMap(null));
+            orangeMarkers = [];
+            paths.forEach(path => path.setMap(null));
+            paths = [];
+
+            // Keep data without initializing robotPathCoordinates here
+            if (selectedDatePathCoordinates.length === 0) {
+                robotPathCoordinates = [];
+            }
+
+            data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // Sort data by time
+
+            data.forEach(gpsData => {
+                const loc = new google.maps.LatLng(gpsData.lat, gpsData.lng);
+                robotPathCoordinates.push(loc);
+                const newMarker = placeOrangeMarker(loc);  // Function to add orange markers
+                orangeMarkers.push(newMarker);
+            });
+
+            // Redraw the path only when there is no path for the selected date
+            if (selectedDatePathCoordinates.length === 0) {
+                redrawPathBetweenMarkers();  // Redraw path between markers
+            }
+        });
+}
+
+function redrawPathBetweenMarkers() {
+    // Remove existing paths
+    if (paths.length > 0) {
+        for (const path of paths) {
+            path.setMap(null);
+        }
+        paths = [];
+    }
+
+    const path = new google.maps.Polyline({
+        path: robotPathCoordinates,
+        geodesic: true,
+        strokeColor: '#FFA500',
+        strokeOpacity: 1.0,
+        strokeWeight: 2,
+        map: map
+    });
+    paths.push(path);
+}
+
+function placeOrangeMarker(location) {
+    const marker = new google.maps.Marker({
+        position: location,
+        map: map,
+        icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 2,
+            fillColor: '#FFA500',
+            fillOpacity: 1,
+            strokeColor: '#FFA500',
+            strokeWeight: 2
+        }
+    });
+    return marker;
+}
+
+function drawPathBetweenMarkers() {
+    // Remove previously drawn paths
+    for (const path of paths) {
+        path.setMap(null);
+    }
+    paths = [];
+
+    const path = new google.maps.Polyline({
+        path: robotPathCoordinates,
+        geodesic: true,
+        strokeColor: '#FFA500',
+        strokeOpacity: 1.0,
+        strokeWeight: 2,
+        map: map
+    });
+    paths.push(path);
+}
+
+
+  
+    function updateRobotMarkersAndPath(gpsData) {
+        if (typeof gpsData.lat === "number" && typeof gpsData.lng === "number") {
+            const latestLocation = new google.maps.LatLng(gpsData.lat, gpsData.lng);
+        
+            if (!isInitialLocationSet) {
+                initializeMapAtLocation(latestLocation);
+                isInitialLocationSet = true;
+                return;
+            }
+        
+            placeRobotMarker(latestLocation);
+            robotPathCoordinates.push(latestLocation);
+        } else {
+            console.error("Invalid GPS data received:", gpsData);
+        }
+    }
+  
+    function placeRobotMarker(location) {
+        if (currentRobotMarker) {
+            currentRobotMarker.setMap(null);
+        }
+  
+        currentRobotMarker = new google.maps.Marker({
+            position: location,
+            map: map,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 2,
+                strokeColor: '#ffff00'
+            }
+        });
+    }
+  
+    function initializeMapAtLocation(location) {
+    const mapElementId = "ecobot_map"; // Generate dynamic element ID
+    map = new google.maps.Map(document.getElementById(mapElementId), {
+        zoom: 15,
+        center: location,
+        disableDefaultUI: true,
+        mapTypeId: 'satellite'
+    });
+}
+
+// < Fetch PostgreSQL Data and Plot Path for a Specific Date >
+var selectedDatePathCoordinates = []; // Variable to store path data for a specific date
+var bluePath = null;
+
+function fetchDataBasedOnDate() {
+    const date = document.getElementById('date-picker').value;
+    fetch(`http://********/get-water-quality?date=${date}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://********',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        if (Array.isArray(data) && data.length > 0) {
+            // Clear existing data for the specific date
+            selectedDatePathCoordinates = [];
+
+            // Filter data received from the server
+            const gpsCoordinates = data
+                .map(d => ({
+                    lat: parseFloat(d.latitude),
+                    lng: parseFloat(d.longitude)
+                }))
+                .filter(coord => !isNaN(coord.lat) && !isNaN(coord.lng)); // Remove invalid values
+
+            // Draw a blue path using the filtered data
+            drawBluePath(gpsCoordinates);
+        }
+    })
+    .catch(error => console.error('Error fetching data:', error));
+}
+
+function drawBluePath(coordinates) {
+    // Remove the existing blue path
+    if (bluePath) {
+        bluePath.setMap(null);
+    }
+
+    // Draw a new blue path
+    bluePath = new google.maps.Polyline({
+        path: coordinates,
+        geodesic: true,
+        strokeColor: '#0000FF',  // Blue
+        strokeOpacity: 1.0,
+        strokeWeight: 2,
+        map: map
+    });
+}
+
+    
+  </script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=****************Q&callback=initMap"></script>

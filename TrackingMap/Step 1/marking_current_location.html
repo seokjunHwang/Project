@@ -1,4 +1,4 @@
-<!-- 경로없이 현재위치만 노랑점으로 계속 갱신되어 표시 -->
+<!-- Display current location, continuously updating -->
 <style>
     #ecobot_map {
         width: 100%;
@@ -12,17 +12,18 @@
     var isInitialLocationSet = false;
     var robotPathCoordinates = [];
     var currentRobotMarker = null;
-    const API_BASE = "http://**************:24003"; // 서버코드 API
-    const ROBOT_ID = 'robot00003'; // 동적로봇 id설정, 필요에따라 이 부분만 변경하기
+    const API_BASE = "http://**************:24003"; // Server API code
+    const ROBOT_ID = 'robot00003'; // Set dynamic robot ID as needed
     const ecobot_ID = "ecobot00003"; 
 
     function initMap() {
-        // 로봇에따라 위도,경도 변경
+        // latitude and longitude
         initializeMapAtLocation(new google.maps.LatLng(35.8410, 128.4587)); 
-        ws_all_tracking_map = new WebSocket('ws://*************:24101'); //MQTT메시지 웹소캣
+        ws_all_tracking_map = new WebSocket('ws://*************:24101'); // Websocket for MQTT messages
         ws_all_tracking_map.onmessage = function (event) {
             const msg = JSON.parse(event.data);
 
+            // Process GPS data and update map
             if (msg.topic === "/"+ecobot_ID+"/gps_location") {
                 const gpsMessage = JSON.parse(msg.message);
                 console.log("Received GPS Data:", gpsMessage);
@@ -37,15 +38,18 @@
     }
 
     function updateRobotMarkersAndPath(gpsData) {
+        // Update robot marker and path with GPS data
         if (typeof gpsData.lat === "number" && typeof gpsData.lng === "number") {
             const latestLocation = new google.maps.LatLng(gpsData.lat, gpsData.lng);
         
+            // Initialize map at first location
             if (!isInitialLocationSet) {
                 initializeMapAtLocation(latestLocation);
                 isInitialLocationSet = true;
                 return;
             }
         
+            // Place robot marker at new location
             placeRobotMarker(latestLocation);
             robotPathCoordinates.push(latestLocation);
         } else {
@@ -54,6 +58,7 @@
     }
 
     function placeRobotMarker(location) {
+        // Place a marker for the robot on the map
         if (currentRobotMarker) {
             currentRobotMarker.setMap(null);
         }
@@ -70,7 +75,8 @@
     }
 
     function initializeMapAtLocation(location) {
-        const mapElementId = "ecobot_map"; // 동적 요소 ID 생성
+        // Initialize map with a given location
+        const mapElementId = "ecobot_map"; // Create dynamic element ID
         map = new google.maps.Map(document.getElementById(mapElementId), {
             zoom: 15,
             center: location,

@@ -1,41 +1,51 @@
-
-// *** 서버코드를 실행시켜놔야 몽고db와 연결되어, 경로가 대시보드에 뜬다. ***
+// Add second server code below : PostgreSQL connection
 
 const express = require('express');
 const mongoose = require('mongoose');
+const { Pool } = require('pg');
 const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
 
 const app = express();
-const PORT = 4003; // 외부포트 24003으로 포트포워딩해놓음
-const gpsdatas_interval = 2000; // gpsdatas에 1초당 1개씩 모든로봇gps저장 (최대 100개 )
-const gps20datas_interval = 60000; // 60000밀리초 = 1분마다 1개씩 gps20datas에 모든로봇 gps데이터 저장 (로봇마다 최대 20개씩)
+const PORT = 4003;
+const gpsdatas_interval = 2000;
+const gps20datas_interval = 60000;
 
-app.use(cors());
+// Database settings
+const MONGO_DATABASE = "********";
+const POSTGRES_DATABASE = "********";
+const POSTGRES_COLLECTION = "********";
+
+// Allow requests from a specific domain
+const corsOptions = {
+    origin: 'http://********:********',
+    credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 const server = http.createServer(app);
-const ws = new WebSocket('ws://************:24101'); // 24101에 전체로봇의 gps데이터가 들어오고있다.
+const ws = new WebSocket('ws://********:********'); // Receives GPS data from all robots on port 24101.
 
 ws.on('open', function open() {
     console.log('Connected to the WebSocket server.');
 });
 
-
-let lastSavedTimestamp = Date.now(); // 마지막 저장 시간을 기록하는 변수를 추가(저장시간 텀을두기위함)
+let lastSavedTimestamp = Date.now(); // Variable to record the last saved time (to control saving frequency)
 
 ws.on('message', async (message) => {
     try {
-        // 현재 시간과 마지막 저장 시간 사이의 차이를 확인
+        // Check the time difference between the current time and the last saved time
         const now = Date.now();
         if (now - lastSavedTimestamp < gpsdatas_interval) {
-            return; 
+            return;
         }
 
         const msg = JSON.parse(message);
         const robotIDPattern = /\/ecobot(\d{5})\/gps_location/;
         const matches = robotIDPattern.exec(msg.topic);
-        
+
         if (matches) {
             const gpsMessage = JSON.parse(msg.message);
             const gpsData = {
@@ -48,7 +58,7 @@ ws.on('message', async (message) => {
             await newGpsData.save();
             console.log("Received and Saved GPS Data:", gpsData);
 
-            lastSavedTimestamp = now; // 저장 시간을 업데이트
+            lastSavedTimestamp = now; // Update the saving time
 
             const count = await GPSdata.countDocuments();
             if (count > 100) {
@@ -64,14 +74,14 @@ ws.on('message', async (message) => {
     }
 });
 
-// 1분마다 1개씩 gps20datas에 gps데이타넣기
+// Insert 1 GPS20 data entry every 1 minute
 setInterval(async () => {
     try {
         const robotIds = [
             "robot00001", "robot00002", "robot00003", "robot00004",
             "robot00005", "robot00006", "robot00007", "robot00008"
         ];
-        
+
         for (let robotID of robotIds) {
             const lastEntry = await GPSdata.findOne({ robotID }).sort('-createdAt').limit(1);
             if (lastEntry) {
@@ -94,7 +104,7 @@ setInterval(async () => {
     } catch (error) {
         console.error("Error processing GPS20 data:", error);
     }
-}, gps20datas_interval); // 60000 = 1분
+}, gps20datas_interval); // 60000 = 1 minute
 
 ws.on('close', function close() {
     console.log('Disconnected from the WebSocket server.');
@@ -104,9 +114,10 @@ server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-const USERNAME = '******';
-const PASSWORD = '******';
-const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:******/******?authSource=******`;
+// Connect to MongoDB
+const USERNAME = '********';
+const PASSWORD = '********';
+const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:********/${MONGO_DATABASE}?authSource=********`;
 
 mongoose.connect(DB_URI, {
     useNewUrlParser: true,
@@ -136,10 +147,10 @@ const gpsDataSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// 모든로봇의 GPS데이타를 gpsdatas컬렉션에 저장하기위한 스키마
+// Schema for storing GPS data for all robots in the gpsdatas collection
 const GPSdata = mongoose.model('GPSdata', gpsDataSchema);
 
-// 1분마다 1개씩 총20개 저장하는 gps20data컬렉션 스키마
+// Schema for storing 20 GPS data points every 1 minute in the gps20datas collection
 const gps20DataSchema = new mongoose.Schema({
     robotID: String,
     lat: Number,
@@ -147,8 +158,9 @@ const gps20DataSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// 1분마다 저장할 gps20 컬렉션을 위한 스키마
+// Schema for the gps20 collection to store, every 1 minute
 const GPS20data = mongoose.model('GPS20data', gps20DataSchema);
+
 
 app.use(express.json());
 
@@ -206,7 +218,7 @@ app.post('/send-course-to-robot', async (req, res) => {
         ]
     };
 
-    fetch(`http://localhost:******/send-mqtt/${robotId}`, {
+    fetch(`http://localhost:4001/send-mqtt/${robotId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -241,7 +253,7 @@ app.get('/delete-course', async (req, res) => {
     }
 });
 
-// 로봇ID를 호출하여 가장 최신gps데이터(현재위치)가져오기
+// load current GPs data
 app.get('/get-latest-location/:robotID', async (req, res) => {
     const { robotID } = req.params;
     try {
@@ -260,10 +272,9 @@ app.get('/get-latest-location/:robotID', async (req, res) => {
     }
 });
 
-// gps20datas 콜렉션에서 주어진 robotID에 해당하는 데이터를 가져옴
-// 각 로봇의 html에서 동적 매개변수인 ROBOT_ID만 바꿔주면 동적으로 API endpoint 호출
+// load GPS data from gps20datas collection(mongoDB) 
 app.get('/get-gps20data-for-robot/:robotID', async (req, res) => {
-    const robotID = req.params.robotID;  // 경로 매개변수에서 robotID 가져옴
+    const robotID = req.params.robotID;  
 
     if (!robotID.startsWith('robot0000') || robotID.length !== 10) {
         return res.status(400).send({ error: "Invalid robotID format" });
@@ -276,4 +287,45 @@ app.get('/get-gps20data-for-robot/:robotID', async (req, res) => {
         console.error(`Error retrieving GPS20 data for ${robotID}:`, err);
         res.status(500).send({ error: `Failed to retrieve GPS20 data for ${robotID}` });
     }
+});
+
+
+// Add second server 
+// Connect to PostgreSQL database
+const pool = new Pool({
+    user: '********',
+    host: '********',
+    database: POSTGRES_DATABASE,
+    password: '********',
+    port: 5432,
+});
+
+// Add route using PostgreSQL database 
+app.get('/get-water-********', async (req, res) => {
+  const date = req.query.date;
+  try {
+    const result = await pool.query(`
+      SELECT timestamp, latitude, longitude 
+      FROM ${POSTGRES_COLLECTION}
+      WHERE DATE(timestamp) = to_date($1, 'YYYY-MM-DD')
+      ORDER BY timestamp`, 
+      [date]
+    );
+
+    const cleanedData = result.rows.filter(row => {
+      // Check if both latitude and longitude are numbers
+      return !isNaN(row.latitude) && !isNaN(row.longitude);
+    }).map(row => {
+      return {
+        timestamp: row.timestamp,
+        latitude: row.latitude,
+        longitude: row.longitude,
+      };
+    });
+
+    res.json(cleanedData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Something went wrong');
+  }
 });

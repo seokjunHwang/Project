@@ -2,20 +2,22 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const app = express();
-const PORT = 4003; // 외부포트 24003으로 포트포워딩해놓음
+const PORT = 4003; // Forwarded to external port 24003
 
-// 코스 설정 : CORS 활성화하여 다른 도메인의 요청을 허용
+// Configure CORS: Allowing requests from different domains
 app.use(cors());
-// 서버 시작: 지정된 포트에서 서버를 실행
+
+// Start the server: Running on the specified port
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-// MongoDB 데이터베이스 연결 설정
+
+// Configure MongoDB connection
 const USERNAME = '*********';
 const PASSWORD = '*********';
 const DB_URI = `mongodb://${USERNAME}:${PASSWORD}@localhost:********/'*********';?authSource='*********';`;
 
-// MongoDB 연결: useNewUrlParser와 useUnifiedTopology 옵션 사용
+// Connect to MongoDB: Using useNewUrlParser and useUnifiedTopology options
 mongoose.connect(DB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -25,63 +27,61 @@ mongoose.connect(DB_URI, {
     console.error("MongoDB connection error:", err);
 });
 
-// ------ 스키마 정의 -------
-// 코스 스키마 : 로봇의 이동경로를 저장할 데이터 형식설정 (= 로봇에게 보내는 메시지형식)
+// ------ Define Schemas -------
+
+// Course Schema: Defines the data format for storing robot's movement paths (= the message format sent to the robot)
 const courseSchema = new mongoose.Schema({
     trackId: { type: String, required: true, unique: true },
-    category: { type: String, required: true }, // 카테고리 필드 추가
+    category: { type: String, required: true }, // Adding a category field
     locations: [{
         id: Number,
         lat: Number,
         lng: Number
     }],
 });
-// 위에서 정의한 스키마를 사용하여 콜렉션 생성
+// Create a collection using the schema defined above
 const Course = mongoose.model('Course', courseSchema);
 
-// 트래킹맵 주황색마커(경로)를 저장할 스키마(형식설정)
+// Schema for storing orange markers (path locations) on the tracking map
 const orangeDotSchema = new mongoose.Schema({
     lat: Number,
     lng: Number,
-    createdAt: { type: Date, default: Date.now }  // 생성된 시간 (나중에 오래된 데이터를 삭제하기 위해)
+    createdAt: { type: Date, default: Date.now }  // Created timestamp (for later data cleanup)
 });
 
-// 위에서 정의한 스키마를 사용하여 경로 콜렉션생성
+// Create a collection for paths using the schema defined above
 const OrangeDot = mongoose.model('OrangeDot', orangeDotSchema, 'course_20');
 
-
-// ------ API 엔드포인트 정의 ------
+// ------ Define API Endpoints ------
 
 app.use(express.json());
 
-// 코스저장 -> 몽고디비에 새로운 코스데이터저장
+// Save a course: Store new course data in MongoDB
 app.post('/save-course', async (req, res) => {
-    console.log("Received Request Body:", req.body); // 요청 본문 로깅
+    console.log("Received Request Body:", req.body); // Log the request body
     try {
-        const { trackId, category, locations } = req.body; // 카테고리 변수 추가
-        const course = new Course({ trackId, category, locations }); // 카테고리 변수 포함하여 코스 생성
+        const { trackId, category, locations } = req.body; // Adding the category variable
+        const course = new Course({ trackId, category, locations }); // Creating a course with the category variable
         await course.save();
         res.status(201).send({ message: "Course saved successfully!" });
     } catch (err) {
-        // 에러 출력
+        // Log errors
         console.error("Error while saving to MongoDB:", err);
         res.status(500).send({ error: "Failed to save the course" });
-        
     }
 });
 
-// 전체 코스가져오기 from 몽고디비
+// Get all courses from MongoDB
 app.get('/get-courses', async (req, res) => {
     try {
-        const courses = await Course.find({}, 'trackId category');  // 카테고리 정보도 함께 반환
+        const courses = await Course.find({}, 'trackId category');  // Also return category information
         res.status(200).send(courses);
     } catch (err) {
         res.status(500).send({ error: "Failed to retrieve courses" });
     }
 });
 
-
-// 특정코스 마커 불러오기 from 몽고디비
+// Get a specific course marker from MongoDB
 app.get('/get-course-by-id', async (req, res) => {
     try {
         const { trackId } = req.query;
@@ -95,7 +95,7 @@ app.get('/get-course-by-id', async (req, res) => {
     }
 });
 
-// 코스정보 로봇에 보내기 ( 몽고 -> 로봇 )
+// Send course information to the robot (from MongoDB to the robot)
 app.post('/send-course-to-robot', async (req, res) => {
     const { trackId, repeat_count, robotId } = req.body;
 
@@ -126,7 +126,7 @@ app.post('/send-course-to-robot', async (req, res) => {
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error("Failed to send MQTT message");
+            throw an Error("Failed to send MQTT message");
         }
         return response.json();
     })
@@ -139,30 +139,29 @@ app.post('/send-course-to-robot', async (req, res) => {
     });
 });
 
-
-// 코스 삭제
+// Delete a course
 app.get('/delete-course', async (req, res) => {
     try {
         const { trackId } = req.query;
         
-        // 해당 trackId를 가진 course를 찾아서 삭제
+        // Find and delete the course with the specified trackId
         const result = await Course.deleteOne({ trackId });
 
-        // 만약 삭제된 문서가 없다면, 즉 해당 trackId를 가진 course가 없다면
+        // If no document was deleted, i.e., no course with the specified trackId was found
         if (result.deletedCount === 0) {
             return res.status(404).send({ error: "Course not found" });
         }
 
-        // 성공적으로 삭제되었으면 성공 메시지를 반환
+        // If the deletion was successful, return a success message
         res.status(200).send({ message: "Successfully deleted course" });
 
     } catch (err) {
-        // 에러 발생 시 500 에러 반환
+        // If an error occurs, return a 500 error
         res.status(500).send({ error: "Failed to delete course" });
     }
 });
 
-// 주황색마커(경로위치가 찍히는점) 몽고디비에 저장
+// Save orange markers (path locations) in MongoDB
 app.post('/save-orange-dot', async (req, res) => {
     try {
         const { lat, lng } = req.body;
@@ -170,11 +169,11 @@ app.post('/save-orange-dot', async (req, res) => {
         const newOrangeDot = new OrangeDot({ lat, lng });
         await newOrangeDot.save();
 
-        // 10개를 초과하는 데이터가 있는지 확인
+        // Check if there are more than 10 data points
         const count = await OrangeDot.countDocuments();
-        console.log(`Orange dot saved. Total count: ${count}`);  // 여기에 로그 추가!
+        console.log(`Orange dot saved. Total count: ${count}`);  // Add a log here!
 
-        let deletedCount = 0;  // 삭제된 데이터의 개수
+        let deletedCount = 0;  // Number of deleted data points
 
         if (count > 10) {
             const exceedingDots = count - 10; 
@@ -188,8 +187,8 @@ app.post('/save-orange-dot', async (req, res) => {
     
         res.status(201).send({
             success: true,
-            totalDocuments: count,  // 현재 문서의 개수
-            deletedDocuments: deletedCount  // 삭제된 문서의 개수
+            totalDocuments: count,  // Current number of documents
+            deletedDocuments: deletedCount  // Number of deleted documents
         });
     } catch (err) {
         res.status(500).send({ success: false, error: "Failed to save the orange dot" });
