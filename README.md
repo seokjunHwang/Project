@@ -5,7 +5,8 @@
 ## 2. MachineLearning - Regression
 
 
-### Mini Project
+
+# Mini Project
 
 - Quant Auto Traiding Bot
 
