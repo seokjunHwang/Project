@@ -1,3 +1,7 @@
+'''
+Server script
+Get signal message from traiding view and save the message
+'''
 import logging
 import os
 import csv
